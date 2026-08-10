@@ -16,28 +16,28 @@ YELLOW='\033[1;33m'
 CYAN='\033[1;36m'
 NC='\033[0m'
 
+# ==============================================
+# LIST DEPLOYED SERVICES WITH FULL DETAILS
+# AUTO-INSTALLS JQ IF MISSING
+# ==============================================
 list_deployed_services() {
-# ==============================================
-# AUTO INSTALL JQ IF MISSING
-# ==============================================
-if ! command -v jq &> /dev/null; then
-  echo -e "\n${YELLOW}⚠️ Installing required tool: jq...${NC}"
-  sudo apt update -qq && sudo apt install -y -qq jq || {
-    echo -e "${RED}❌ Failed to install jq!${NC}"
-    exit 1
-  }
-  echo -e "${GREEN}✅ jq installed successfully!${NC}"
-fi
+  # Install jq if missing
+  if ! command -v jq &> /dev/null; then
+    echo -e "\n${YELLOW}⚠️ Installing required tool: jq...${NC}"
+    apt update -qq && apt install -y -qq jq || {
+      echo -e "${RED}❌ Failed to install jq!${NC}"
+      read -p "Press [Enter] to return..."
+      return 1
+    }
+    echo -e "${GREEN}✅ jq installed successfully!${NC}"
+  fi
 
-# ==============================================
-# LIST SERVICES (NO MORE N/A)
-# ==============================================
-list_deployed_services() {
   echo -e "\n======================================"
-  echo -e "${CYAN}📋 kiana 2.4 - ALL DEPLOYED SERVICES - FULL DETAILS${NC}"
+  echo -e "${CYAN}📋 KIANA 2.4 - ALL DEPLOYED SERVICES - FULL DETAILS${NC}"
   echo -e "======================================"
-  PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
-  echo "Project: $PROJECT_ID"
+  
+  PROJECT_ID="$(gcloud config get-value project 2>/dev/null || echo "")"
+  echo "Project: ${PROJECT_ID:-N/A}"
   echo ""
 
   declare -A REGION_NAMES=(
@@ -57,22 +57,24 @@ list_deployed_services() {
 
   SERVICES=$(gcloud run services list \
     --format="value(metadata.name, status.url, region, metadata.creationTimestamp.date(%Y-%m-%d))" \
-    --project="$PROJECT_ID" 2>/dev/null)
+    --project="$PROJECT_ID" 2>/dev/null || echo "")
 
   if [ -z "$SERVICES" ]; then
     echo -e "${RED}❌ No services found.${NC}"
   else
     local COUNT=1
-    while IFS=$'\t' read -r NAME URL REGION CREATED; do
+    while IFS=$'\t' read -r NAME URL REGION CREATED || [ -n "$NAME" ]; do
       [ -z "$NAME" ] && continue
       FULL_REGION="${REGION_NAMES[$REGION]:-$REGION}"
+      URL="${URL:-N/A}"
+      CREATED="${CREATED:-N/A}"
 
-      DETAILS=$(gcloud run services describe "$NAME" --region "$REGION" --project="$PROJECT_ID" --format=json 2>/dev/null)
+      DETAILS=$(gcloud run services describe "$NAME" --region "$REGION" --project="$PROJECT_ID" --format=json 2>/dev/null || echo "{}")
 
       MEMORY=$(echo "$DETAILS" | jq -r '.spec.template.spec.containers[0].resources.limits.memory // "1Gi"')
       CPU=$(echo "$DETAILS" | jq -r '.spec.template.spec.containers[0].resources.limits.cpu // "1"')
-      BILLING=$(echo "$DETAILS" | jq -r '.spec.template.spec.billingMode // "Instance Based"' | sed 's/_/ /g;s/^./\U&/')
-      MIN_INST=$(echo "$DETAILS" | jq -r '.spec.template.spec.minInstances // "1"')
+      BILLING=$(echo "$DETAILS" | jq -r '.spec.template.spec.billingMode // "INSTANCE_BASED"' | sed 's/_/ /g;s/^./\U&/')
+      MIN_INST=$(echo "$DETAILS" | jq -r '.spec.template.spec.minInstances // "0"')
       MAX_INST=$(echo "$DETAILS" | jq -r '.spec.template.spec.maxInstances // "1"')
       CONCURRENCY=$(echo "$DETAILS" | jq -r '.spec.template.spec.containerConcurrency // "300"')
 
@@ -95,7 +97,7 @@ list_deployed_services() {
 }
 
 # ==============================================
-# ✅ FULL REGION SELECTOR RESTORED
+# REGION SELECTOR (Clean & Safe)
 # ==============================================
 select_region() {
   echo -e "\n=== GCP CLOUD RUN REGION SELECTION ==="
@@ -120,9 +122,9 @@ select_region() {
   echo "0) Enter custom region code"
   echo ""
 
-  read -p "Enter region number: " REGION_NUM
+  read -r -p "Enter region number: " REGION_NUM
 
-  case $REGION_NUM in
+  case "$REGION_NUM" in
     1) REGION="us-central1" ;;
     2) REGION="us-east1" ;;
     3) REGION="us-east4" ;;
@@ -135,11 +137,11 @@ select_region() {
     10) REGION="europe-west1" ;;
     11) REGION="europe-west4" ;;
     12) REGION="europe-west9" ;;
-    0) read -p "Type full region code: " REGION ;;
+    0) read -r -p "Type full region code: " REGION ;;
     *) echo -e "${YELLOW}⚠️ Invalid! Using us-central1${NC}"; REGION="us-central1" ;;
   esac
 
-  echo -e "${GREEN}✅ Selected Region:${NC} $REGION"
+  echo -e "${GREEN}✅ Selected Region: ${NC}$REGION"
 }
 
 deploy_new_service() {
