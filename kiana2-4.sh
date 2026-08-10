@@ -23,15 +23,40 @@ list_deployed_services() {
   PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
   echo "Project: $PROJECT_ID"
   echo ""
+
+  # Get list of services (filtered or all)
+  SERVICES=$(gcloud run services list --format="value(metadata.name,region)" --filter="metadata.name~^xray-" --project="$PROJECT_ID" 2>/dev/null)
   
-  gcloud run services list \
-    --format="table(metadata.name, status.url, region, metadata.creationTimestamp.date(%Y-%m-%d))" \
-    --filter="metadata.name~^xray-" \
-    --project="$PROJECT_ID" || {
-      echo -e "${YELLOW}ℹ️ No 'xray-' services found. Showing ALL services:\n${NC}"
-      gcloud run services list --format="table(metadata.name, status.url, region)" --project="$PROJECT_ID"
-    }
-  
+  if [ -z "$SERVICES" ]; then
+    echo -e "${YELLOW}ℹ️ No 'xray-' services found. Showing ALL services:\n${NC}"
+    SERVICES=$(gcloud run services list --format="value(metadata.name,region)" --project="$PROJECT_ID" 2>/dev/null)
+    [ -z "$SERVICES" ] && { echo "No services deployed."; echo -e "\n======================================"; read -p "Press [Enter] to return to Main Menu..."; return; }
+  fi
+
+  # Print detailed info for each service
+  while read NAME REGION; do
+    echo -e "${GREEN}🔹 Service: $NAME${NC}"
+    echo "Region: $REGION"
+    
+    # Fetch detailed config
+    URL=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(status.url)" 2>/dev/null || echo "N/A")
+    CREATED=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(metadata.creationTimestamp.date(%Y-%m-%d %H:%M))" 2>/dev/null || echo "N/A")
+    MEM=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(template.spec.containers[0].resources.limits.memory)" 2>/dev/null || echo "N/A")
+    CPU=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(template.spec.containers[0].resources.limits.cpu)" 2>/dev/null || echo "N/A")
+    BILLING=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(template.spec.billingMode)" 2>/dev/null || echo "Default")
+    MIN_SCALE=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(template.spec.minScale)" 2>/dev/null || echo "0")
+    MAX_SCALE=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(template.spec.maxScale)" 2>/dev/null || echo "100")
+    TIMEOUT=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(template.spec.timeoutSeconds)" 2>/dev/null || echo "60")
+
+    echo "URL: $URL"
+    echo "Created: $CREATED"
+    echo "Memory / vCPU: $MEM | $CPU"
+    echo "Billing Mode: $BILLING"
+    echo "Instances: Min $MIN_SCALE | Max $MAX_SCALE"
+    echo "Timeout: $TIMEOUT seconds"
+    echo "--------------------------------------"
+  done <<< "$SERVICES"
+
   echo -e "\n======================================"
   read -p "Press [Enter] to return to Main Menu..."
 }
