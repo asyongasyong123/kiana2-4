@@ -186,11 +186,11 @@ deploy_new_service() {
   echo -e "${YELLOW}Instance-Based = More Stable, No Throttling${NC}"
   echo "1) Request-Based  |  2) Instance-Based"
   while true; do
-      read -p "Select [1-2]: " BILLING_CHOICE
+      read -r -p "Select [1-2]: " BILLING_CHOICE
       case $BILLING_CHOICE in
           1) BILLING_MODE="request"; break ;;
           2) BILLING_MODE="instance"; break ;;
-          *) echo -e "${RED}Invalid input!Enter only 1 or 2${NC}" ;;
+          *) echo -e "${RED}Invalid input! Enter only 1 or 2${NC}" ;;
       esac
   done
 
@@ -199,21 +199,21 @@ deploy_new_service() {
   echo -e "${CYAN}=========================================${NC}"
   echo -e "${YELLOW}Basic: 1Gi RAM + 1vCPU / Balance: 2Gi RAM + 2vCPU / Max: 4Gi + 4vCPU${NC}"
   while true; do
-      read -p "Memory [ 1 = 1Gi | 2 = 2Gi | 3 = 4Gi ]: " MEM
+      read -r -p "Memory [ 1 = 1Gi | 2 = 2Gi | 3 = 4Gi ]: " MEM
       case $MEM in
           1) MEMORY="1Gi"; break ;;
           2) MEMORY="2Gi"; break ;;
           3) MEMORY="4Gi"; break ;;
-          *) echo -e "${RED} Invalid input!Enter only 1,2 or 3${NC}" ;;
+          *) echo -e "${RED} Invalid input! Enter only 1,2 or 3${NC}" ;;
       esac
   done
   while true; do
-      read -p "vCPU [ 1 = 1vCPU | 2 = 2vCPU | 3 = 4vCPU ]: " CPU_SEL
+      read -r -p "vCPU [ 1 = 1vCPU | 2 = 2vCPU | 3 = 4vCPU ]: " CPU_SEL
       case $CPU_SEL in
           1) CPU="1"; break ;;
           2) CPU="2"; break ;;
           3) CPU="4"; break ;;
-          *) echo -e "${RED} Invalid input!Enter only 1,2 or 3 ${NC}" ;;
+          *) echo -e "${RED} Invalid input! Enter only 1,2 or 3 ${NC}" ;;
       esac
   done
 
@@ -226,12 +226,12 @@ deploy_new_service() {
 
   echo -e "${YELLOW}💡 Min Instances = 1 = No Disconnects${NC}"
   while true; do
-      read -p "Min Instances [0/1, default=0]: " MIN_INST
+      read -r -p "Min Instances [0/1, default=0]: " MIN_INST
       MIN_INST=${MIN_INST:-0}
       [[ "$MIN_INST" =~ ^[0-1]$ ]] && break || echo -e "${RED}Only 0 or 1 allowed${NC}"
   done
   while true; do
-      read -p "Max Instances [1-2, default=1]: " MAX_INST
+      read -r -p "Max Instances [1-2, default=1]: " MAX_INST
       MAX_INST=${MAX_INST:-1}
       [[ "$MAX_INST" =~ ^[1-2]$ ]] && break || echo -e "${RED}Only 1-2 allowed${NC}"
   done
@@ -256,7 +256,7 @@ cat > config.json <<'EOF'
     {
       "tag": "trojan-ws",
       "port": 10001,
-      "listen": "127.0.0.1",
+      "listen": "::",
       "protocol": "trojan",
       "settings": { "clients": [{"password": "kiana-2", "level": 0}] },
       "sniffing": { "enabled": true, "destOverride": ["http","tls","quic"], "routeOnly": true },
@@ -276,7 +276,7 @@ cat > config.json <<'EOF'
     {
       "tag": "vless-ws",
       "port": 10002,
-      "listen": "127.0.0.1",
+      "listen": "::",
       "protocol": "vless",
       "settings": { "clients": [{"id": "a1b2c3d4-5678-40ef-98ab-cdef01234567", "level": 0}], "decryption": "none" },
       "sniffing": { "enabled": true, "destOverride": ["http","tls","quic"], "routeOnly": true },
@@ -355,7 +355,7 @@ http {
         listen 8080 deferred reuseport;
         server_name _;
         
-        location /health {
+        location = /health {
             return 200 "OK"; 
             add_header Content-Type text/plain; 
         }
@@ -394,6 +394,7 @@ EOF
 
   cat > entrypoint.sh <<'EOF'
 #!/bin/sh
+set -e
 /usr/local/bin/xray run -c /etc/xray.json &
 sleep 3
 exec /usr/local/openresty/bin/openresty -g 'daemon off;'
@@ -481,7 +482,7 @@ while true; do
   echo "2) List all deployed services & URLs"
   echo "3) Exit script"
   echo "======================================"
-  read -p "Select an option [1-3]: " MENU_CHOICE
+  read -r -p "Select an option [1-3]: " MENU_CHOICE
 
   case $MENU_CHOICE in
     1) deploy_new_service ;;
