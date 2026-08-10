@@ -311,7 +311,7 @@ http {
         listen 8080 deferred reuseport;
         server_name _;
         
-        location = /health {
+        location /health {
             return 200 "OK"; 
             add_header Content-Type text/plain; 
         }
