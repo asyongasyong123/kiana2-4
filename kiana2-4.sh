@@ -311,6 +311,11 @@ http {
     server {
         listen 8080 deferred reuseport;
         server_name _;
+        
+        location = /health {
+            return 200 "OK"; 
+            add_header Content-Type text/plain; 
+        }
 
         location / {
             proxy_pass https://www.google.com;
