@@ -17,69 +17,110 @@ CYAN='\033[1;36m'
 NC='\033[0m'
 
 list_deployed_services() {
+# ==============================================
+# AUTO INSTALL JQ IF MISSING
+# ==============================================
+if ! command -v jq &> /dev/null; then
+  echo -e "\n${YELLOW}⚠️ Installing required tool: jq...${NC}"
+  sudo apt update -qq && sudo apt install -y -qq jq || {
+    echo -e "${RED}❌ Failed to install jq!${NC}"
+    exit 1
+  }
+  echo -e "${GREEN}✅ jq installed successfully!${NC}"
+fi
+
+# ==============================================
+# LIST SERVICES (NO MORE N/A)
+# ==============================================
+list_deployed_services() {
   echo -e "\n======================================"
-  echo -e "${CYAN}📋 ALL DEPLOYED KIANA 2.4-XRAY SERVICES${NC}"
+  echo -e "${CYAN}📋 kiana 2.4 - ALL DEPLOYED SERVICES - FULL DETAILS${NC}"
   echo -e "======================================"
   PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
   echo "Project: $PROJECT_ID"
   echo ""
 
-  SERVICES=$(gcloud run services list --format="value(metadata.name,region)" --project="$PROJECT_ID" 2>/dev/null)
-  
-  if [ -z "$SERVICES" ]; then
-    echo -e "${YELLOW}ℹ️ Walay nakit-an nga serbisyo.${NC}"
-  else
-    while read -r NAME REGION; do
-      echo -e "${GREEN}🔹 Serbisyo: $NAME${NC}"
-      echo "📍 Rehiyon: $REGION"
-      
-      # ✅ FIX: Ensure variables never empty
-      URL=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(status.url)" 2>/dev/null || echo "N/A")
-      CREATED=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(metadata.creationTimestamp.date(%Y-%m-%d))" 2>/dev/null || echo "N/A")
-      MEM=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(template.spec.containers[0].resources.limits.memory)" 2>/dev/null || echo "N/A")
-      CPU=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(template.spec.containers[0].resources.limits.cpu)" 2>/dev/null || echo "N/A")
-      BILLING=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(template.spec.billingMode)" 2>/dev/null || echo "Default")
-      MIN_INST=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(template.spec.minScale)" 2>/dev/null || echo "0")
-      MAX_INST=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(template.spec.maxScale)" 2>/dev/null || echo "100")
-      TIMEOUT=$(gcloud run services describe "$NAME" --region="$REGION" --format="value(template.spec.timeoutSeconds)" 2>/dev/null || echo "60")
+  declare -A REGION_NAMES=(
+    ["us-central1"]="Iowa, United States 🇺🇸"
+    ["us-east1"]="South Carolina, United States 🇺🇸"
+    ["us-east4"]="N. Virginia, United States 🇺🇸"
+    ["us-west1"]="Oregon, United States 🇺🇸"
+    ["asia-east1"]="Taiwan 🇹🇼"
+    ["asia-southeast1"]="Singapore 🇸🇬"
+    ["asia-northeast1"]="Tokyo, Japan 🇯🇵"
+    ["asia-northeast3"]="Seoul, South Korea 🇰🇷"
+    ["europe-west1"]="Belgium 🇧🇪"
+    ["europe-west4"]="Netherlands 🇳🇱"
+    ["europe-west9"]="Paris, France 🇫🇷"
+    ["asia-south1"]="Mumbai, India 🇮🇳"
+  )
 
-      echo "🔗 URL: ${URL:-N/A}"
-      echo "📅 Gihimo: ${CREATED:-N/A}"
-      echo "💾 Memory / CPU: ${MEM:-N/A} | ${CPU:-N/A} vCPU"
-      echo "💳 Paagi sa Pagbayad: ${BILLING:-Default}"
-      echo "⚖️ Instansya: Min ${MIN_INST:-0} | Max ${MAX_INST:-100}"
-      echo "⏱️ Oras: ${TIMEOUT:-60} segundos"
-      echo "--------------------------------------"
+  SERVICES=$(gcloud run services list \
+    --format="value(metadata.name, status.url, region, metadata.creationTimestamp.date(%Y-%m-%d))" \
+    --project="$PROJECT_ID" 2>/dev/null)
+
+  if [ -z "$SERVICES" ]; then
+    echo -e "${RED}❌ No services found.${NC}"
+  else
+    local COUNT=1
+    while IFS=$'\t' read -r NAME URL REGION CREATED; do
+      [ -z "$NAME" ] && continue
+      FULL_REGION="${REGION_NAMES[$REGION]:-$REGION}"
+
+      DETAILS=$(gcloud run services describe "$NAME" --region "$REGION" --project="$PROJECT_ID" --format=json 2>/dev/null)
+
+      MEMORY=$(echo "$DETAILS" | jq -r '.spec.template.spec.containers[0].resources.limits.memory // "1Gi"')
+      CPU=$(echo "$DETAILS" | jq -r '.spec.template.spec.containers[0].resources.limits.cpu // "1"')
+      BILLING=$(echo "$DETAILS" | jq -r '.spec.template.spec.billingMode // "Instance Based"' | sed 's/_/ /g;s/^./\U&/')
+      MIN_INST=$(echo "$DETAILS" | jq -r '.spec.template.spec.minInstances // "1"')
+      MAX_INST=$(echo "$DETAILS" | jq -r '.spec.template.spec.maxInstances // "1"')
+      CONCURRENCY=$(echo "$DETAILS" | jq -r '.spec.template.spec.containerConcurrency // "300"')
+
+      echo -e "${GREEN}=== SERVICE #$COUNT ===${NC}"
+      echo "🔹 Name:         $NAME"
+      echo "🔹 URL:          $URL"
+      echo "🔹 Region:       $REGION → $FULL_REGION"
+      echo "🔹 Created:      $CREATED"
+      echo "🔹 Resources:    $MEMORY RAM | $CPU vCPU"
+      echo "🔹 Billing:      $BILLING"
+      echo "🔹 Instances:    Min $MIN_INST / Max $MAX_INST"
+      echo "🔹 Connections:  Max $CONCURRENCY"
+      echo ""
+      ((COUNT++))
     done <<< "$SERVICES"
   fi
-
+  
   echo -e "\n======================================"
-  read -p "Pindota [Enter] para mobalik sa Menu..."
+  read -p "Press [Enter] to return..."
 }
 
+# ==============================================
+# ✅ FULL REGION SELECTOR RESTORED
+# ==============================================
 select_region() {
-  echo -e "\n=== GCP Cloud Run Region Selection ==="
+  echo -e "\n=== GCP CLOUD RUN REGION SELECTION ==="
   echo "--- North America ---"
-  echo "1) us-central1      (Iowa, US - Recommended)"
-  echo "2) us-east1         (South Carolina, US)"
-  echo "3) us-east4         (Northern Virginia, US)"
-  echo "4) us-west1         (Oregon, US)"
+  echo "1) us-central1      (Iowa, US 🇺🇸)"
+  echo "2) us-east1         (South Carolina, US 🇺🇸)"
+  echo "3) us-east4         (N. Virginia, US 🇺🇸)"
+  echo "4) us-west1         (Oregon, US 🇺🇸)"
   echo ""
   echo "--- Asia Pacific ---"
-  echo "5) asia-east1       (Taiwan 🇹🇼)"
-  echo "6) asia-southeast1  (Singapore)"
-  echo "7) asia-northeast1  (Tokyo, Japan)"
-  echo "8) asia-northeast3  (Seoul, South Korea)"
+  echo "5) asia-east1       (Taiwan 🇹🇼 — RECOMMENDED!)"
+  echo "6) asia-southeast1  (Singapore 🇸🇬)"
+  echo "7) asia-northeast1   (Tokyo, Japan 🇯🇵)"
+  echo "8) asia-northeast3   (Seoul, South Korea 🇰🇷)"
+  echo "9) asia-south1      (Mumbai, India 🇮🇳)"
   echo ""
   echo "--- Europe ---"
-  echo "9) europe-west1     (Belgium)"
-  echo "10) europe-west4    (Netherlands)"
-  echo "11) europe-west9    (Paris, France)"
+  echo "10) europe-west1     (Belgium 🇧🇪)"
+  echo "11) europe-west4    (Netherlands 🇳🇱)"
+  echo "12) europe-west9    (Paris, France 🇫🇷)"
   echo ""
-  echo "0) Manually enter custom region code"
+  echo "0) Enter custom region code"
   echo ""
 
-  read -p "Enter number for your selected region: " REGION_NUM
+  read -p "Enter region number: " REGION_NUM
 
   case $REGION_NUM in
     1) REGION="us-central1" ;;
@@ -90,11 +131,12 @@ select_region() {
     6) REGION="asia-southeast1" ;;
     7) REGION="asia-northeast1" ;;
     8) REGION="asia-northeast3" ;;
-    9) REGION="europe-west1" ;;
-    10) REGION="europe-west4" ;;
-    11) REGION="europe-west9" ;;
-    0) read -p "Enter full region code: " REGION ;;
-    *) echo -e "${YELLOW}⚠️ Invalid input! Using default: us-central1${NC}"; REGION="us-central1" ;;
+    9) REGION="asia-south1" ;;
+    10) REGION="europe-west1" ;;
+    11) REGION="europe-west4" ;;
+    12) REGION="europe-west9" ;;
+    0) read -p "Type full region code: " REGION ;;
+    *) echo -e "${YELLOW}⚠️ Invalid! Using us-central1${NC}"; REGION="us-central1" ;;
   esac
 
   echo -e "${GREEN}✅ Selected Region:${NC} $REGION"
