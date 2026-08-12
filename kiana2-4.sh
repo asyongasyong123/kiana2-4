@@ -241,6 +241,10 @@ deploy_new_service() {
 cat > config.json <<'EOF'
 {
   "log": { "loglevel": "warning" },
+  "dns": {
+    "servers": ["8.8.8.8", "8.8.4.4"],
+    "strategy": "UseIPv4"
+  },
   "policy": {
     "levels": {
       "0": {
@@ -256,40 +260,51 @@ cat > config.json <<'EOF'
     {
       "tag": "trojan-ws",
       "port": 10001,
-      "listen": "::",
+      "listen": "127.0.0.1",
       "protocol": "trojan",
       "settings": { "clients": [{"password": "kiana-2", "level": 0}] },
       "sniffing": { "enabled": true, "destOverride": ["http","tls","quic"], "routeOnly": true },
       "streamSettings": {
         "network": "ws",
-        "wsSettings": { "path": "/tr-ws?ed=2560", "maxEarlyData": 2560 },
+        "wsSettings": {
+          "path": "/tr-ws?ed=2560",
+          "maxEarlyData": 2560,
+          "earlyDataHeaderName": ""
+        },
         "sockopt": {
           "tcpNoDelay": true,
           "tcpFastOpen": true,
           "tcpKeepAlive": true,
           "tcpKeepAliveIdle": 15,
           "tcpKeepAliveInterval": 10,
-          "tcpKeepAliveCount": 5
+          "tcpKeepAliveProbes": 3
         }
       }
     },
     {
       "tag": "vless-ws",
       "port": 10002,
-      "listen": "::",
+      "listen": "127.0.0.1",
       "protocol": "vless",
-      "settings": { "clients": [{"id": "a1b2c3d4-5678-40ef-98ab-cdef01234567", "level": 0}], "decryption": "none" },
+      "settings": {
+        "clients": [{"id": "a1b2c3d4-5678-40ef-98ab-cdef01234567", "level": 0}],
+        "decryption": "none"
+      },
       "sniffing": { "enabled": true, "destOverride": ["http","tls","quic"], "routeOnly": true },
       "streamSettings": {
         "network": "ws",
-        "wsSettings": { "path": "/vl-ws?ed=2560", "maxEarlyData": 2560 },
+        "wsSettings": {
+          "path": "/vl-ws?ed=2560",
+          "maxEarlyData": 2560,
+          "earlyDataHeaderName": ""
+        },
         "sockopt": {
           "tcpNoDelay": true,
           "tcpFastOpen": true,
           "tcpKeepAlive": true,
           "tcpKeepAliveIdle": 15,
           "tcpKeepAliveInterval": 10,
-          "tcpKeepAliveCount": 5
+          "tcpKeepAliveProbes": 3
         }
       }
     }
@@ -297,14 +312,18 @@ cat > config.json <<'EOF'
   "outbounds": [
     {
       "protocol": "freedom",
-      "settings": {
-        "domainStrategy": "UseIPv4v6",
-        "tcpKeepAliveIdle": 15,
-        "tcpKeepAliveInterval": 10
-      }
+      "tag": "direct",
+      "settings": { "domainStrategy": "UseIPv4" }
     }
-  ]
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [
+      { "type": "Field", "inboundTag": ["trojan-ws", "vless-ws"], "outboundTag": "direct" }
+    ]
+  }
 }
+
 EOF
 
 cat > nginx.conf <<'EOF'
