@@ -245,10 +245,10 @@ cat > config.json <<'EOF'
     "levels": {
       "0": {
         "handshake": 2,
-        "connIdle": 86400,
+        "connIdle": 300,
         "uplinkOnly": 0,
         "downlinkOnly": 0,
-        "bufferSize": 2097152
+        "bufferSize": 65536
       }
     }
   },
