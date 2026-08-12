@@ -323,7 +323,6 @@ cat > config.json <<'EOF'
     ]
   }
 }
-
 EOF
 
 cat > nginx.conf <<'EOF'
@@ -346,8 +345,8 @@ http {
     tcp_nodelay on;
     tcp_nopush on;
     types_hash_max_size 2048;
-
-    keepalive_timeout 86400;
+    
+    keepalive_timeout 3600;
     keepalive_requests 100000;
 
     client_max_body_size 0;
@@ -357,11 +356,10 @@ http {
     proxy_request_buffering off;
     proxy_cache off;
     proxy_http_version 1.1;
-    proxy_set_header Connection "";
 
     proxy_connect_timeout 10s;
-    proxy_send_timeout 86400s;
-    proxy_read_timeout 86400s;
+    proxy_send_timeout 3600s;
+    proxy_read_timeout 3600s;
 
     server_tokens off;
 
@@ -374,9 +372,10 @@ http {
         listen 8080 deferred reuseport;
         server_name _;
         
+        # ✅ Health check (Cloud Run standard)
         location = /health {
-            return 200 "OK"; 
-            add_header Content-Type text/plain; 
+            return 200 "OK";
+            add_header Content-Type text/plain;
         }
 
         location / {
@@ -390,22 +389,28 @@ http {
 
         location /tr-ws {
             proxy_pass http://127.0.0.1:10001;
+            proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection $connection_upgrade;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_buffering off;
+            proxy_read_timeout 3600s;
+            proxy_send_timeout 3600s;
         }
-
+        
         location /vl-ws {
             proxy_pass http://127.0.0.1:10002;
+            proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection $connection_upgrade;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_buffering off;
+            proxy_read_timeout 3600s;
+            proxy_send_timeout 3600s;
         }
     }
 }
