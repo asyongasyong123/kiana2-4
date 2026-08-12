@@ -262,7 +262,7 @@ cat > config.json <<'EOF'
       "sniffing": { "enabled": true, "destOverride": ["http","tls","quic"], "routeOnly": true },
       "streamSettings": {
         "network": "ws",
-        "wsSettings": { "path": "/tr-ws?ed=2560", "maxEarlyData": 1048576 },
+        "wsSettings": { "path": "/tr-ws?ed=2560", "maxEarlyData": 2560 },
         "sockopt": {
           "tcpNoDelay": true,
           "tcpFastOpen": true,
@@ -282,7 +282,7 @@ cat > config.json <<'EOF'
       "sniffing": { "enabled": true, "destOverride": ["http","tls","quic"], "routeOnly": true },
       "streamSettings": {
         "network": "ws",
-        "wsSettings": { "path": "/vl-ws?ed=2560", "maxEarlyData": 1048576 },
+        "wsSettings": { "path": "/vl-ws?ed=2560", "maxEarlyData": 2560 },
         "sockopt": {
           "tcpNoDelay": true,
           "tcpFastOpen": true,
