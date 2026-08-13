@@ -263,7 +263,7 @@ cat > config.json <<'EOF'
       "listen": "127.0.0.1",
       "protocol": "trojan",
       "settings": { "clients": [{"password": "kiana-2", "level": 0}] },
-      "sniffing": { "enabled": true, "destOverride": ["http","tls","quic"], "routeOnly": true },
+      "sniffing": { "enabled": true, "destOverride": ["http","tls"], "routeOnly": true },
       "streamSettings": {
         "network": "ws",
         "wsSettings": {
@@ -290,7 +290,7 @@ cat > config.json <<'EOF'
         "clients": [{"id": "a1b2c3d4-5678-40ef-98ab-cdef01234567", "level": 0}],
         "decryption": "none"
       },
-      "sniffing": { "enabled": true, "destOverride": ["http","tls","quic"], "routeOnly": true },
+      "sniffing": { "enabled": true, "destOverride": ["http","tls"], "routeOnly": true },
       "streamSettings": {
         "network": "ws",
         "wsSettings": {
