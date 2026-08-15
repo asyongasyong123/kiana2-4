@@ -251,8 +251,7 @@ cat > config.json <<'EOF'
         "handshake": 2,
         "connIdle": 300,
         "uplinkOnly": 0,
-        "downlinkOnly": 0,
-        "bufferSize": 65536
+        "downlinkOnly": 0
       }
     }
   },
