@@ -2,12 +2,11 @@
 set -euo pipefail
 
 # =========================================
-# 🚀 KIANA-2.4 GCP DEPLOYER | BOTH LINKS INCLUDED
-# ✅ FIXED LIST SYNTAX ERROR
+# 🚀 KIANA-2.4 GCP DEPLOYER | OPTIMIZED + ADBLOCK
 # ✅ SHOWS SHORT LINK + FULL LINK
 # ✅ REGION SELECTOR WITH TAIWAN
 # ✅ PERSISTENT MENU LOOP
-# ✅ BALANCED XRAY/NGINX CONFIG
+# ✅ BALANCED XRAY/NGINX CONFIG + ADBLOCKER
 # =========================================
 
 GREEN='\033[1;32m'
@@ -16,17 +15,19 @@ YELLOW='\033[1;33m'
 CYAN='\033[1;36m'
 NC='\033[0m'
 
+# 🔗 I-change kini nga URL sa imong mismong GitHub repo link
+GITHUB_URL="https://github.com/your-username/kiana-gcp-deployer"
+
 # ==============================================
 # LIST DEPLOYED SERVICES WITH FULL DETAILS
 # AUTO-INSTALLS JQ IF MISSING
 # ==============================================
 list_deployed_services() {
-  # Install jq if missing
   if ! command -v jq &> /dev/null; then
     echo -e "\n${YELLOW}⚠️ Installing required tool: jq...${NC}"
     apt update -qq && apt install -y -qq jq || {
       echo -e "${RED}❌ Failed to install jq!${NC}"
-      read -p "Press [Enter] to return..."
+      read -r -p "Press [Enter] to return..."
       return 1
     }
     echo -e "${GREEN}✅ jq installed successfully!${NC}"
@@ -38,6 +39,7 @@ list_deployed_services() {
   
   PROJECT_ID="$(gcloud config get-value project 2>/dev/null || echo "")"
   echo "Project: ${PROJECT_ID:-N/A}"
+  echo "GitHub Repo: $GITHUB_URL"
   echo ""
 
   declare -A REGION_NAMES=(
@@ -93,11 +95,11 @@ list_deployed_services() {
   fi
   
   echo -e "\n======================================"
-  read -p "Press [Enter] to return..."
+  read -r -p "Press [Enter] to return..."
 }
 
 # ==============================================
-# REGION SELECTOR (Clean & Safe)
+# REGION SELECTOR
 # ==============================================
 select_region() {
   echo -e "\n=== GCP CLOUD RUN REGION SELECTION ==="
@@ -147,8 +149,8 @@ select_region() {
 deploy_new_service() {
   select_region
 
-  PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
-  RAND=$(openssl rand -hex 3 2>/dev/null)
+  PROJECT_ID="$(gcloud config get-value project 2>/dev/null || echo "")"
+  RAND=$(openssl rand -hex 3 2>/dev/null || echo "app$RANDOM")
   CLOUD_RUN_SERVICE_NAME="xray-balanced-$RAND"
   BUILD_DIR=$(mktemp -d)
 
@@ -159,11 +161,12 @@ deploy_new_service() {
   echo ""
   echo -e "${CYAN}==========================================================${NC}"
   echo -e "${GREEN}     KIANA 2.4 GCP CLOUDSHELL DEPLOYER BY Con Fig${NC}"
-  echo -e "${YELLOW}     TROJAN & VLESS WS + TLS | 2 PROTOCOLS ONLY${NC}"
+  echo -e "${YELLOW}     TROJAN & VLESS WS + TLS | WITH BUILT-IN ADBLOCK${NC}"
   echo -e "${RED}     MANUAL SET REGION,INSTANCES,BILLING,MEMORY & vCPU${NC}"
   echo -e "${GREEN}     BALANCED XRAY.JSON AND NGINX.CONF${NC}"
   echo -e "${YELLOW}     STABLE | BALANCED SPEED & LOW BATTERY USAGE${NC}"
   echo -e "${RED}     SMOOTH STREAMING & FASTER DOWNLOAD SPEED | 8-25MB/s+${NC}"
+  echo -e "${CYAN}     GITHUB: $GITHUB_URL${NC}"
   echo -e "${GREEN}     FOR FREENET USE ONLY DAHIL ANG MAHAL MAGPALOAD😄✌️${NC}"
   echo -e "${CYAN}==========================================================${NC}"
   echo -e "${GREEN}✅ Project:${NC} $PROJECT_ID"
@@ -174,7 +177,7 @@ deploy_new_service() {
   if [ -z "$PROJECT_ID" ]; then
       echo -e "${RED}ERROR: No GCP project set!${NC}"
       echo -e "Run: gcloud config set project YOUR_PROJECT_ID"
-      read -p "Press [Enter] to return to Main Menu..."
+      read -r -p "Press [Enter] to return to Main Menu..."
       return
   fi
 
@@ -220,7 +223,7 @@ deploy_new_service() {
   if [ "$CPU" = "1" ] || [ "$MEMORY" = "1Gi" ]; then
       CONCURRENCY="300"
   else
-      CONCURRENCY="800"
+      CONCURRENCY="500"
   fi
   TIMEOUT="3600"
 
@@ -261,7 +264,7 @@ cat > config.json <<'EOF'
       "port": 10001,
       "listen": "127.0.0.1",
       "protocol": "trojan",
-      "settings": { "clients": [{"password": "kiana-2", "level": 0}] },
+      "settings": { "clients": [{"password": "kiana-2.4", "level": 0}] },
       "sniffing": { "enabled": true, "destOverride": ["http","tls"], "routeOnly": true },
       "streamSettings": {
         "network": "ws",
@@ -313,12 +316,22 @@ cat > config.json <<'EOF'
       "protocol": "freedom",
       "tag": "direct",
       "settings": { "domainStrategy": "UseIPv4" }
+    },
+    {
+      "protocol": "blackhole",
+      "tag": "block",
+      "settings": { "response": { "type": "none" } }
     }
   ],
   "routing": {
     "domainStrategy": "IPIfNonMatch",
     "rules": [
-      { "type": "Field", "inboundTag": ["trojan-ws", "vless-ws"], "outboundTag": "direct" }
+      {
+        "type": "field",
+        "outboundTag": "block",
+        "geosite": ["category-ads-all"]
+      },
+      { "type": "field", "inboundTag": ["trojan-ws", "vless-ws"], "outboundTag": "direct" }
     ]
   }
 }
@@ -368,10 +381,9 @@ http {
     }
 
     server {
-        listen 8080 deferred reuseport;
+        listen 8080;
         server_name _;
         
-        # ✅ Health check (Cloud Run standard)
         location = /health {
             return 200 "OK";
             add_header Content-Type text/plain;
@@ -453,28 +465,20 @@ EOF
     --timeout $TIMEOUT --min-instances $MIN_INST --max-instances $MAX_INST \
     --execution-environment gen2 --cpu-boost $BILLING_FLAGS --quiet
 
-  CLOUD_RUN_URL=$(gcloud run services describe $CLOUD_RUN_SERVICE_NAME --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')
+  CLOUD_RUN_URL=$(gcloud run services describe $CLOUD_RUN_SERVICE_NAME --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)' 2>/dev/null || echo "")
   DOMAIN=$(echo "$CLOUD_RUN_URL" | sed 's|https://||')
-  SHORT_LINK="$CLOUD_RUN_URL"
-  FULL_LINK="$CLOUD_RUN_URL"
   
   echo -e "\n${GREEN}=========================================${NC}"
   echo -e "${YELLOW}✅ DEPLOYMENT SUCCESS!✅${NC}"
   echo -e "${RED}=========================================${NC}"
   echo ""
-  echo -e "${GREEN}Service Name:${NC}"
-  echo -e " $CLOUD_RUN_SERVICE_NAME"
+  echo -e "${GREEN}Service Name:${NC} $CLOUD_RUN_SERVICE_NAME"
+  echo -e "${YELLOW}Region:${NC}       $REGION"
+  echo -e "${CYAN}GitHub Repo:${NC}   $GITHUB_URL"
+  echo -e "${RED}🔗 SERVICE URL:${NC} $CLOUD_RUN_URL"
+  echo -e "${GREEN}💚 HEALTH CHECK:${NC} $CLOUD_RUN_URL/health"
   echo ""
-  echo -e "${YELLOW}Region:${NC}"
-  echo -e " $REGION"
-  echo ""
-  echo -e "${RED}🔗 SHORT LINK:${NC}"
-  echo -e " $SHORT_LINK"
-  echo ""
-  echo -e "${GREEN}💚 HEALTH CHECK:${NC}"
-  echo -e " $FULL_LINK/health"
-  echo ""
-  echo -e "\n${YELLOW}===== NETMOD CONFIGURATIONS =====${NC}"
+  echo -e "${YELLOW}===== NETMOD CONFIGURATIONS =====${NC}"
   echo -e "${RED}🔹 TROJAN + WS + TLS${NC}"
   echo "   Address: firebase-settings.crashlytics.com"
   echo "   Port: 443"
@@ -491,9 +495,9 @@ EOF
   echo "   Security: TLS"
   echo "   SNI: firebaseremoteconfigrealtime.googleapis.com"
   echo -e "${YELLOW}=========================================${NC}"
-  echo -e "${RED}💡 Balanced config = no overheating, stable speeds, low battery drain!${NC}"
+  echo -e "${RED}💡 Balanced config (500 max concurrency) + Built-in Adblock active!${NC}"
 
-  read -p "\nPress [Enter] to return to Main Menu..."
+  read -r -p "Press [Enter] to return to Main Menu..."
 }
 
 while true; do
